@@ -7,6 +7,7 @@ const OPERATORS = {
   'lt': '<',
   'gte': '>=',
   'lte': '<=',
+  'like' : 'like',
 };
 
 class Sqlite extends Connection {
@@ -129,6 +130,12 @@ class Sqlite extends Connection {
     for (let key in query._criteria) {
       let value = query._criteria[key];
       let [ field, operator = 'eq' ] = key.split('!');
+
+      // add by januar: for chek if operator like value change to %
+      if(operator == 'like'){
+        value ='%'+value +'%';
+      }
+
       data.push(value);
       wheres.push(`${field} ${OPERATORS[operator]} ?`);
     }
