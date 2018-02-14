@@ -80,6 +80,25 @@ class Sqlite extends Connection {
     });
   }
 
+  async count (query, callback = () => {}) {
+    let sqlArr = [ `SELECT count(*) as count FROM ${query.schema.name}` ];
+    let [ wheres, data ] = this.getWhere(query);
+    if (wheres) {
+      sqlArr.push(wheres);
+    }
+
+    let sql = sqlArr.join(' ');
+
+    let db = await this.getDb();
+
+    let results = await db.all(sql, data);
+
+    return results.map(row => {
+      callback(row);
+      return row;
+    });
+  }
+
   async delete (query, callback) {
     let [ wheres, data ] = this.getWhere(query);
     let sqlArr = [`DELETE FROM ${query.schema.name}`];
