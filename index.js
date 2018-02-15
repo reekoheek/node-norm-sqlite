@@ -148,6 +148,12 @@ class Sqlite extends Connection {
     let data = [];
     for (let key in query._criteria) {
       let value = query._criteria[key];
+      if(key === '!or'){
+        let or = this.getOr(value);
+        wheres.push(or.where);
+        data = data.concat(or.data);
+        continue;
+      }
       let [ field, operator = 'eq' ] = key.split('!');
 
       // add by januar: for chek if operator like value change to %
@@ -156,6 +162,7 @@ class Sqlite extends Connection {
       }
 
       data.push(value);
+
       wheres.push(`${field} ${OPERATORS[operator]} ?`);
     }
 
@@ -164,6 +171,22 @@ class Sqlite extends Connection {
     }
 
     return [ `WHERE ${wheres.join(' AND ')}`, data ];
+  }
+
+  getOr(query){
+    let wheres = [];
+    let data = [];
+    for (let i = 0; i < query.length; i++) {
+        let key = Object.keys(query[i])[0];
+        let value = Object.values(query[i])[0];
+        let [ field, operator = 'eq' ] = key.split('!');
+        if(operator == 'like'){
+          value ='%'+value +'%';
+        }
+        data.push(value);
+        wheres.push(`${field} ${OPERATORS[operator]} ?`);
+    }
+    return {where : `(${wheres.join(' OR ')})`,data:data };
   }
 
   async getDb () {
