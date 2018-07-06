@@ -1,6 +1,6 @@
 {
   "name": "node-norm-sqlite",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Sqlite adapter for norm",
   "main": "index.js",
   "scripts": {
