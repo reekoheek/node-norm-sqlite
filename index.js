@@ -7,7 +7,7 @@ const OPERATORS = {
   'lt': '<',
   'gte': '>=',
   'lte': '<=',
-  'like' : 'like',
+  'like': 'like',
 };
 
 class Sqlite extends Connection {
@@ -15,13 +15,16 @@ class Sqlite extends Connection {
     super(options);
 
     this._db = options.db;
+    if (this._db) {
+      return;
+    }
     this.file = options.file || ':memory:';
   }
 
   async insert (query, callback = () => {}) {
     let fieldNames = query.schema.fields.map(field => field.name);
     if (!fieldNames.length) {
-      fieldNames = query._inserts.reduce((fieldNames, row) => {
+      fieldNames = query.rows.reduce((fieldNames, row) => {
         for (let f in row) {
           if (fieldNames.indexOf(f) === -1) {
             fieldNames.push(f);
@@ -37,7 +40,7 @@ class Sqlite extends Connection {
     let db = await this.getDb();
 
     let changes = 0;
-    await Promise.all(query._inserts.map(async row => {
+    await Promise.all(query.rows.map(async row => {
       let rowData = fieldNames.map(f => row[f]);
       let result = await db.run(sql, rowData);
       row.id = result.lastID;
@@ -60,11 +63,11 @@ class Sqlite extends Connection {
       sqlArr.push(orderBys);
     }
 
-    if (query._limit >= 0) {
-      sqlArr.push(`LIMIT ${query._limit}`);
+    if (query.length >= 0) {
+      sqlArr.push(`LIMIT ${query.length}`);
 
-      if (query._skip > 0) {
-        sqlArr.push(`OFFSET ${query._skip}`);
+      if (query.offset > 0) {
+        sqlArr.push(`OFFSET ${query.offset}`);
       }
     }
 
@@ -114,8 +117,8 @@ class Sqlite extends Connection {
 
   getOrderBy (query) {
     let orderBys = [];
-    for (let key in query._sorts) {
-      let val = query._sorts[key];
+    for (let key in query.sorts) {
+      let val = query.sorts[key];
 
       orderBys.push(`${key} ${val ? 'ASC' : 'DESC'}`);
     }
@@ -128,12 +131,12 @@ class Sqlite extends Connection {
   }
 
   async update (query) {
-    let keys = Object.keys(query._sets);
+    let keys = Object.keys(query.sets);
 
     let db = await this.getDb();
     // let db = await sqlite.open(this.file);
 
-    let params = keys.map(k => query._sets[k]);
+    let params = keys.map(k => query.sets[k]);
     let placeholder = keys.map(k => `${k} = ?`);
 
     let [ wheres, data ] = this.getWhere(query);
@@ -146,9 +149,9 @@ class Sqlite extends Connection {
   getWhere (query) {
     let wheres = [];
     let data = [];
-    for (let key in query._criteria) {
-      let value = query._criteria[key];
-      if(key === '!or'){
+    for (let key in query.criteria) {
+      let value = query.criteria[key];
+      if (key === '!or') {
         let or = this.getOr(value);
         wheres.push(or.where);
         data = data.concat(or.data);
@@ -157,8 +160,8 @@ class Sqlite extends Connection {
       let [ field, operator = 'eq' ] = key.split('!');
 
       // add by januar: for chek if operator like value change to %
-      if(operator == 'like'){
-        value ='%'+value +'%';
+      if (operator === 'like') {
+        value = `%${value}%`;
       }
 
       data.push(value);
@@ -173,20 +176,20 @@ class Sqlite extends Connection {
     return [ `WHERE ${wheres.join(' AND ')}`, data ];
   }
 
-  getOr(query){
+  getOr (query) {
     let wheres = [];
     let data = [];
     for (let i = 0; i < query.length; i++) {
-        let key = Object.keys(query[i])[0];
-        let value = Object.values(query[i])[0];
-        let [ field, operator = 'eq' ] = key.split('!');
-        if(operator == 'like'){
-          value ='%'+value +'%';
-        }
-        data.push(value);
-        wheres.push(`${field} ${OPERATORS[operator]} ?`);
+      let key = Object.keys(query[i])[0];
+      let value = Object.values(query[i])[0];
+      let [ field, operator = 'eq' ] = key.split('!');
+      if (operator === 'like') {
+        value = '%' + value + '%';
+      }
+      data.push(value);
+      wheres.push(`${field} ${OPERATORS[operator]} ?`);
     }
-    return {where : `(${wheres.join(' OR ')})`,data:data };
+    return { where: `(${wheres.join(' OR ')})`, data };
   }
 
   async getDb () {
