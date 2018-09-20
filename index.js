@@ -83,11 +83,21 @@ class Sqlite extends Connection {
     });
   }
 
-  async count (query, callback = () => {}) {
+  async count (query, useSkipAndLimit = false) {
     let sqlArr = [ `SELECT count(*) as count FROM ${query.schema.name}` ];
     let [ wheres, data ] = this.getWhere(query);
     if (wheres) {
       sqlArr.push(wheres);
+    }
+
+    if (useSkipAndLimit) {
+      if (query.length >= 0) {
+        sqlArr.push(`LIMIT ${query.length}`);
+
+        if (query.offset > 0) {
+          sqlArr.push(`OFFSET ${query.offset}`);
+        }
+      }
     }
 
     let sql = sqlArr.join(' ');
@@ -97,7 +107,6 @@ class Sqlite extends Connection {
     let results = await db.all(sql, data);
 
     return results.map(row => {
-      callback(row);
       return row;
     });
   }
