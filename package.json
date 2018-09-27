@@ -1,12 +1,11 @@
 {
   "name": "node-norm-sqlite",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Sqlite adapter for norm",
   "main": "index.js",
   "scripts": {
     "lint": "eslint .",
-    "test": "mocha test/**",
-    "precommit": "npm run lint && npm test"
+    "test": "mocha test/**"
   },
   "repository": {
     "type": "git",
@@ -15,19 +14,24 @@
   "author": "Ganesha <reekoheek@gmail.com> (http://sagara.id)",
   "license": "MIT",
   "devDependencies": {
-    "babel-eslint": "^8.2.6",
-    "eslint": "^5.4.0",
-    "eslint-config-standard": "^11.0.0",
-    "eslint-config-xinix": "^1.1.1",
+    "babel-eslint": "^10.0.1",
+    "eslint": "^5.6.0",
+    "eslint-config-standard": "^12.0.0",
+    "eslint-config-xinix": "^1.1.2",
     "eslint-plugin-import": "^2.14.0",
     "eslint-plugin-node": "^7.0.1",
-    "eslint-plugin-promise": "^4.0.0",
-    "eslint-plugin-standard": "^3.1.0",
-    "husky": "^0.14.3",
+    "eslint-plugin-promise": "^4.0.1",
+    "eslint-plugin-standard": "^4.0.0",
+    "husky": "^1.0.1",
     "mocha": "^5.2.0",
-    "node-norm": "^1.2.2"
+    "node-norm": "^1.2.3"
   },
   "dependencies": {
     "sqlite": "^3.0.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run lint && npm test"
+    }
   }
 }

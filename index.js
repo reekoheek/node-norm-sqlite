@@ -104,11 +104,8 @@ class Sqlite extends Connection {
 
     let db = await this.getDb();
 
-    let results = await db.all(sql, data);
-
-    return results.map(row => {
-      return row;
-    });
+    let row = await db.get(sql, data);
+    return row.count;
   }
 
   async delete (query, callback) {

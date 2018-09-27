@@ -45,10 +45,9 @@ describe('Cases', () => {
 
   it('delete record with escape character', async () => {
     await manager.runSession(async session => {
-      await session.factory('test1', {group: '3'}).delete();
+      await session.factory('test1', { group: '3' }).delete();
 
       let foos = await db.all('SELECT * FROM test1');
-      console.info(foos);
       assert.strictEqual(foos.length, 1);
     });
   });
