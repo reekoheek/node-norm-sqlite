@@ -35,7 +35,7 @@ class Sqlite extends Connection {
     }
 
     let placeholder = fieldNames.map(f => '?');
-    let sql = `INSERT INTO ${query.schema.name} (${fieldNames.join(',')}) VALUES (${placeholder})`;
+    let sql = `INSERT INTO ${query.schema.name} (${'`' + fieldNames.join('`,`') + '`'}) VALUES (${placeholder})`;
 
     let db = await this.getDb();
 
@@ -129,7 +129,7 @@ class Sqlite extends Connection {
     for (let key in query.sorts) {
       let val = query.sorts[key];
 
-      orderBys.push(`${key} ${val ? 'ASC' : 'DESC'}`);
+      orderBys.push(`${'`' + key + '`'} ${val ? 'ASC' : 'DESC'}`);
     }
 
     if (!orderBys.length) {
@@ -146,7 +146,7 @@ class Sqlite extends Connection {
     // let db = await sqlite.open(this.file);
 
     let params = keys.map(k => query.sets[k]);
-    let placeholder = keys.map(k => `${k} = ?`);
+    let placeholder = keys.map(k => `${'`' + k + '`'} = ?`);
 
     let [ wheres, data ] = this.getWhere(query);
     let sql = `UPDATE ${query.schema.name} SET ${placeholder.join(', ')} ${wheres}`;
@@ -175,7 +175,7 @@ class Sqlite extends Connection {
 
       data.push(value);
 
-      wheres.push(`${field} ${OPERATORS[operator]} ?`);
+      wheres.push(`${'`' + field + '`'} ${OPERATORS[operator]} ?`);
     }
 
     if (!wheres.length) {
