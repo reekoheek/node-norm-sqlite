@@ -35,7 +35,7 @@ class Sqlite extends Connection {
     }
 
     let placeholder = fieldNames.map(f => '?');
-    let sql = `INSERT INTO ${query.schema.name} (${'`' + fieldNames.join('`,`') + '`'}) VALUES (${placeholder})`;
+    let sql = `INSERT INTO ${query.schema.name} (${fieldNames.map(field => { return this.escapeStatement(field); }).join(',')}) VALUES (${placeholder})`;
 
     let db = await this.getDb();
 
@@ -129,7 +129,7 @@ class Sqlite extends Connection {
     for (let key in query.sorts) {
       let val = query.sorts[key];
 
-      orderBys.push(`${'`' + key + '`'} ${val ? 'ASC' : 'DESC'}`);
+      orderBys.push(`${this.escapeStatement(key)} ${val ? 'ASC' : 'DESC'}`);
     }
 
     if (!orderBys.length) {
@@ -146,7 +146,7 @@ class Sqlite extends Connection {
     // let db = await sqlite.open(this.file);
 
     let params = keys.map(k => query.sets[k]);
-    let placeholder = keys.map(k => `${'`' + k + '`'} = ?`);
+    let placeholder = keys.map(k => `${this.escapeStatement(k)} = ?`);
 
     let [ wheres, data ] = this.getWhere(query);
     let sql = `UPDATE ${query.schema.name} SET ${placeholder.join(', ')} ${wheres}`;
@@ -166,6 +166,7 @@ class Sqlite extends Connection {
         data = data.concat(or.data);
         continue;
       }
+
       let [ field, operator = 'eq' ] = key.split('!');
 
       // add by januar: for chek if operator like value change to %
@@ -175,7 +176,7 @@ class Sqlite extends Connection {
 
       data.push(value);
 
-      wheres.push(`${'`' + field + '`'} ${OPERATORS[operator]} ?`);
+      wheres.push(`${this.escapeStatement(field)} ${OPERATORS[operator]} ?`);
     }
 
     if (!wheres.length) {
@@ -196,7 +197,7 @@ class Sqlite extends Connection {
         value = '%' + value + '%';
       }
       data.push(value);
-      wheres.push(`${field} ${OPERATORS[operator]} ?`);
+      wheres.push(`${this.escapeStatement(field)} ${OPERATORS[operator]} ?`);
     }
     return { where: `(${wheres.join(' OR ')})`, data };
   }
@@ -206,6 +207,10 @@ class Sqlite extends Connection {
       this._db = await sqlite.open(this.file);
     }
     return this._db;
+  }
+
+  escapeStatement (field) {
+    return '`' + field + '`';
   }
 }
 
