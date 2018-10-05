@@ -126,7 +126,7 @@ class Sqlite extends Connection {
     for (let key in query.sorts) {
       let val = query.sorts[key];
 
-      orderBys.push(`${this.escapeStatement(key)} ${val ? 'ASC' : 'DESC'}`);
+      orderBys.push(`${this.escapeStatement(key)} ${val > 0 ? 'ASC' : 'DESC'}`);
     }
 
     if (!orderBys.length) {
