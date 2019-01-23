@@ -1,5 +1,7 @@
 const Connection = require('node-norm/connection');
-const sqlite = require('sqlite');
+const betterSqlite3 = require('better-sqlite3');
+// const debug = require('debug')('node-norm-sqlite:index');
+const debugQuery = require('debug')('node-norm-sqlite:query');
 
 const OPERATORS = {
   'eq': '=',
@@ -10,12 +12,16 @@ const OPERATORS = {
   'like': 'like',
 };
 
+let index = 0;
+
 class Sqlite extends Connection {
   constructor (options) {
     super(options);
 
+    this.index = index++;
+    this.dbProvided = Boolean(options.db);
     this._db = options.db;
-    if (this._db) {
+    if (this.dbProvided) {
       return;
     }
     this.file = options.file || ':memory:';
@@ -34,25 +40,30 @@ class Sqlite extends Connection {
       }, []);
     }
 
-    let placeholder = fieldNames.map(f => '?');
-    let sql = `INSERT INTO ${query.schema.name} (${fieldNames.map(field => { return this.escapeStatement(field); }).join(',')}) VALUES (${placeholder})`;
-
-    let db = await this.getDb();
+    let placeholder = fieldNames.map(f => '?').join(', ');
+    let sql = `INSERT INTO ${this.escape(query.schema.name)}` +
+      ` (${fieldNames.map(f => this.escape(f)).join(', ')})` +
+      ` VALUES (${placeholder})`;
 
     let changes = 0;
     await Promise.all(query.rows.map(async row => {
-      let rowData = fieldNames.map(f => row[f]);
-      let result = await db.run(sql, rowData);
+      let rowData = fieldNames.map(f => {
+        let value = this.serialize(row[f]);
+        return value;
+      });
+
+      let { result } = await this.rawQuery(sql, rowData);
       row.id = result.lastID;
-      callback(row);
       changes += result.changes;
+
+      callback(row);
     }));
 
     return changes;
   }
 
   async load (query, callback = () => {}) {
-    let sqlArr = [ `SELECT * FROM ${query.schema.name}` ];
+    let sqlArr = [ `SELECT * FROM ${this.escape(query.schema.name)}` ];
     let [ wheres, data ] = this.getWhere(query);
     if (wheres) {
       sqlArr.push(wheres);
@@ -73,18 +84,16 @@ class Sqlite extends Connection {
 
     let sql = sqlArr.join(' ');
 
-    let db = await this.getDb();
+    let { result } = await this.rawQuery(sql, data);
 
-    let results = await db.all(sql, data);
-
-    return results.map(row => {
+    return result.map(row => {
       callback(row);
       return row;
     });
   }
 
   async count (query, useSkipAndLimit = false) {
-    let sqlArr = [ `SELECT count(*) as count FROM ${query.schema.name}` ];
+    let sqlArr = [ `SELECT count(*) as ${this.escape('count')} FROM ${this.escape(query.schema.name)}` ];
     let [ wheres, data ] = this.getWhere(query);
     if (wheres) {
       sqlArr.push(wheres);
@@ -102,9 +111,7 @@ class Sqlite extends Connection {
 
     let sql = sqlArr.join(' ');
 
-    let db = await this.getDb();
-
-    let row = await db.get(sql, data);
+    let { result: [ row ] } = await this.rawQuery(sql, data);
     return row.count;
   }
 
@@ -117,8 +124,7 @@ class Sqlite extends Connection {
 
     let sql = sqlArr.join(' ');
 
-    let db = await this.getDb();
-    await db.run(sql, data);
+    await this.rawQuery(sql, data);
   }
 
   getOrderBy (query) {
@@ -126,7 +132,7 @@ class Sqlite extends Connection {
     for (let key in query.sorts) {
       let val = query.sorts[key];
 
-      orderBys.push(`${this.escapeStatement(key)} ${val > 0 ? 'ASC' : 'DESC'}`);
+      orderBys.push(`${this.escape(key)} ${val > 0 ? 'ASC' : 'DESC'}`);
     }
 
     if (!orderBys.length) {
@@ -139,15 +145,12 @@ class Sqlite extends Connection {
   async update (query) {
     let keys = Object.keys(query.sets);
 
-    let db = await this.getDb();
-    // let db = await sqlite.open(this.file);
-
     let params = keys.map(k => query.sets[k]);
-    let placeholder = keys.map(k => `${this.escapeStatement(k)} = ?`);
+    let placeholder = keys.map(k => `${this.escape(k)} = ?`);
 
     let [ wheres, data ] = this.getWhere(query);
     let sql = `UPDATE ${query.schema.name} SET ${placeholder.join(', ')} ${wheres}`;
-    let result = await db.run(sql, params.concat(data));
+    let { result } = await this.rawQuery(sql, params.concat(data));
 
     return result.changes;
   }
@@ -157,6 +160,7 @@ class Sqlite extends Connection {
     let data = [];
     for (let key in query.criteria) {
       let value = query.criteria[key];
+
       if (key === '!or') {
         let or = this.getOr(value);
         wheres.push(or.where);
@@ -172,8 +176,7 @@ class Sqlite extends Connection {
       }
 
       data.push(value);
-
-      wheres.push(`${this.escapeStatement(field)} ${OPERATORS[operator]} ?`);
+      wheres.push(`${this.escape(field)} ${OPERATORS[operator]} ?`);
     }
 
     if (!wheres.length) {
@@ -194,20 +197,86 @@ class Sqlite extends Connection {
         value = '%' + value + '%';
       }
       data.push(value);
-      wheres.push(`${this.escapeStatement(field)} ${OPERATORS[operator]} ?`);
+      wheres.push(`${this.escape(field)} ${OPERATORS[operator]} ?`);
     }
     return { where: `(${wheres.join(' OR ')})`, data };
   }
 
-  async getDb () {
+  async getRaw () {
     if (!this._db) {
-      this._db = await sqlite.open(this.file);
+      this._db = betterSqlite3(this.file);
+      this._db.pragma('journal_mode = WAL');
+      await new Promise(resolve => setTimeout(resolve));
     }
+
     return this._db;
   }
 
-  escapeStatement (field) {
+  async rawQuery (sql, params = []) {
+    if (debugQuery.enabled && !['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) {
+      debugQuery('SQL %d %s', this.index, sql);
+      debugQuery('??? %d %o', this.index, params);
+    }
+
+    let conn = await this.getRaw();
+    if (sql.startsWith('SELECT')) {
+      let result = await conn.prepare(sql).all(...params);
+      return { result };
+    } else {
+      let result = await conn.prepare(sql).run(...params);
+      return { result };
+    }
+  }
+
+  escape (field) {
     return '`' + field + '`';
+  }
+
+  async _begin () {
+    await this.rawQuery('BEGIN');
+  }
+
+  async _commit () {
+    if (!this._db || !this._db.inTransaction) {
+      return;
+    }
+    await this.rawQuery('COMMIT');
+  }
+
+  async _rollback () {
+    if (!this._db || !this._db.inTransaction) {
+      return;
+    }
+    await this.rawQuery('ROLLBACK');
+  }
+
+  serialize (value) {
+    if (value === null) {
+      return value;
+    }
+
+    if (value instanceof Date) {
+      return value;
+      // return value.toISOString().slice(0, 19).replace('T', ' ');
+    }
+
+    if (typeof value === 'object') {
+      if (typeof value.toJSON === 'function') {
+        return value.toJSON();
+      } else {
+        return JSON.stringify(value);
+      }
+    }
+
+    return value;
+  }
+
+  end () {
+    if (this.dbProvided || !this._db || !this._db.open) {
+      return;
+    }
+
+    this._db.close();
   }
 }
 

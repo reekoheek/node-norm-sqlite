@@ -1,6 +1,6 @@
 {
   "name": "node-norm-sqlite",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "Sqlite adapter for norm",
   "main": "index.js",
   "scripts": {
@@ -14,20 +14,13 @@
   "author": "Ganesha <reekoheek@gmail.com> (http://sagara.id)",
   "license": "MIT",
   "devDependencies": {
-    "babel-eslint": "^10.0.1",
-    "eslint": "^5.6.1",
-    "eslint-config-standard": "^12.0.0",
-    "eslint-config-xinix": "^1.1.2",
-    "eslint-plugin-import": "^2.14.0",
-    "eslint-plugin-node": "^7.0.1",
-    "eslint-plugin-promise": "^4.0.1",
-    "eslint-plugin-standard": "^4.0.0",
     "husky": "^1.1.1",
     "mocha": "^5.2.0",
     "node-norm": "^1.2.6"
   },
   "dependencies": {
-    "sqlite": "^3.0.0"
+    "better-sqlite3": "^5.4.0",
+    "debug": "^4.1.1"
   },
   "husky": {
     "hooks": {
