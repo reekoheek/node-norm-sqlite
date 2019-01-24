@@ -56,7 +56,7 @@ class Sqlite extends Connection {
       });
 
       let { result } = await this.rawQuery(sql, rowData);
-      row.id = result.lastID;
+      row.id = result.lastInsertRowid;
       changes += result.changes;
 
       callback(row);
