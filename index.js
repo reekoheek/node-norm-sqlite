@@ -261,8 +261,8 @@ class Sqlite extends Connection {
 
     if (value instanceof Date) {
       // return value.toISOString();
-      return value.toISOString().slice(0, 19).replace('T', ' ');
-      // return value.getTime();
+      // return value.toISOString().slice(0, 19).replace('T', ' ');
+      return value.getTime();
     }
 
     let valueType = typeof value;

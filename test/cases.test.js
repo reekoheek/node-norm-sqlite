@@ -4,6 +4,7 @@ const adapter = require('../');
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
+const NDateTime = require('node-norm/schemas/ndatetime');
 
 describe('Cases', () => {
   const DB_FILE = path.join(process.cwd(), 'test.db');
@@ -30,6 +31,14 @@ describe('Cases', () => {
         {
           adapter,
           db,
+          schemas: [
+            {
+              name: 'bar',
+              fields: [
+                new NDateTime('datetime'),
+              ],
+            },
+          ],
         },
       ],
     });
@@ -65,16 +74,38 @@ describe('Cases', () => {
     });
   });
 
-  it('update record with fields: date', async () => {
+  it.only('update record with fields: date', async () => {
     await manager.runSession(async session => {
+      let datetime = new Date(); // '1982-11-21 00:00:00';
+      // console.log(new Date(datetime));
       let { affected } = await session.factory('bar', 1)
-        .set({
-          datetime: new Date(),
-        })
+        .set({ datetime })
         .save();
+
       assert.strictEqual(affected, 1);
+
       let bar = await db.prepare('SELECT * FROM bar WHERE id = 1').get();
       assert(bar);
+
+      {
+        let bar = await session.factory('bar', 1).single();
+        // console.log(bar);
+        await session.factory('bar', 1)
+          .set(bar)
+          .save();
+      }
+
+      let bar1 = await db.prepare('SELECT * FROM bar WHERE id = 1').get();
+      assert(bar1);
+      assert.strictEqual(bar.datetime.toString(), bar1.datetime.toString());
+
+      {
+        let bar = await session.factory('bar', 1).single();
+        // console.log(bar);
+        await session.factory('bar', 1)
+          .set(bar)
+          .save();
+      }
     });
   });
 
