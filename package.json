@@ -1,6 +1,6 @@
 {
   "name": "node-norm-sqlite",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Sqlite adapter for norm",
   "main": "index.js",
   "scripts": {
@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^5.4.0",
-    "debug": "^4.1.1"
+    "debug": "^4.1.1",
+    "fser": "^0.1.2"
   },
   "husky": {
     "hooks": {

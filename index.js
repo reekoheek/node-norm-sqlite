@@ -2,6 +2,9 @@ const Connection = require('node-norm/connection');
 const betterSqlite3 = require('better-sqlite3');
 // const debug = require('debug')('node-norm-sqlite:index');
 const debugQuery = require('debug')('node-norm-sqlite:query');
+const path = require('path');
+const fser = require('fser');
+const fs = require('fs');
 
 const OPERATORS = {
   'eq': '=',
@@ -204,6 +207,7 @@ class Sqlite extends Connection {
 
   async getRaw () {
     if (!this._db) {
+      await fser.mkdirp(fs, path.dirname(this.file));
       this._db = betterSqlite3(this.file);
       this._db.pragma('journal_mode = WAL');
       await new Promise(resolve => setTimeout(resolve));
@@ -256,16 +260,22 @@ class Sqlite extends Connection {
     }
 
     if (value instanceof Date) {
-      return value;
-      // return value.toISOString().slice(0, 19).replace('T', ' ');
+      // return value.toISOString();
+      return value.toISOString().slice(0, 19).replace('T', ' ');
+      // return value.getTime();
     }
 
-    if (typeof value === 'object') {
+    let valueType = typeof value;
+    if (valueType === 'object') {
       if (typeof value.toJSON === 'function') {
         return value.toJSON();
       } else {
         return JSON.stringify(value);
       }
+    }
+
+    if (valueType === 'boolean') {
+      return value ? 1 : 0;
     }
 
     return value;
