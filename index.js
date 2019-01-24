@@ -148,7 +148,7 @@ class Sqlite extends Connection {
   async update (query) {
     let keys = Object.keys(query.sets);
 
-    let params = keys.map(k => query.sets[k]);
+    let params = keys.map(k => this.serialize(query.sets[k]));
     let placeholder = keys.map(k => `${this.escape(k)} = ?`);
 
     let [ wheres, data ] = this.getWhere(query);
