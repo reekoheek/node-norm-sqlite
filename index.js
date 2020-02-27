@@ -3,16 +3,15 @@ const betterSqlite3 = require('better-sqlite3');
 // const debug = require('debug')('node-norm-sqlite:index');
 const debugQuery = require('debug')('node-norm-sqlite:query');
 const path = require('path');
-const fser = require('fser');
-const fs = require('fs');
+const fs = require('fs-extra');
 
 const OPERATORS = {
-  'eq': '=',
-  'gt': '>',
-  'lt': '<',
-  'gte': '>=',
-  'lte': '<=',
-  'like': 'like',
+  eq: '=',
+  gt: '>',
+  lt: '<',
+  gte: '>=',
+  lte: '<=',
+  like: 'like',
 };
 
 let index = 0;
@@ -34,7 +33,7 @@ class Sqlite extends Connection {
     let fieldNames = query.schema.fields.map(field => field.name);
     if (!fieldNames.length) {
       fieldNames = query.rows.reduce((fieldNames, row) => {
-        for (let f in row) {
+        for (const f in row) {
           if (fieldNames.indexOf(f) === -1) {
             fieldNames.push(f);
           }
@@ -43,19 +42,19 @@ class Sqlite extends Connection {
       }, []);
     }
 
-    let placeholder = fieldNames.map(f => '?').join(', ');
-    let sql = `INSERT INTO ${this.escape(query.schema.name)}` +
+    const placeholder = fieldNames.map(f => '?').join(', ');
+    const sql = `INSERT INTO ${this.escape(query.schema.name)}` +
       ` (${fieldNames.map(f => this.escape(f)).join(', ')})` +
       ` VALUES (${placeholder})`;
 
     let changes = 0;
     await Promise.all(query.rows.map(async row => {
-      let rowData = fieldNames.map(f => {
-        let value = this.serialize(row[f]);
+      const rowData = fieldNames.map(f => {
+        const value = this.serialize(row[f]);
         return value;
       });
 
-      let { result } = await this.rawQuery(sql, rowData);
+      const { result } = await this.rawQuery(sql, rowData);
       row.id = result.lastInsertRowid;
       changes += result.changes;
 
@@ -66,13 +65,13 @@ class Sqlite extends Connection {
   }
 
   async load (query, callback = () => {}) {
-    let sqlArr = [ `SELECT * FROM ${this.escape(query.schema.name)}` ];
-    let [ wheres, data ] = this.getWhere(query);
+    const sqlArr = [`SELECT * FROM ${this.escape(query.schema.name)}`];
+    const [wheres, data] = this.getWhere(query);
     if (wheres) {
       sqlArr.push(wheres);
     }
 
-    let orderBys = this.getOrderBy(query);
+    const orderBys = this.getOrderBy(query);
     if (orderBys) {
       sqlArr.push(orderBys);
     }
@@ -85,9 +84,9 @@ class Sqlite extends Connection {
       }
     }
 
-    let sql = sqlArr.join(' ');
+    const sql = sqlArr.join(' ');
 
-    let { result } = await this.rawQuery(sql, data);
+    const { result } = await this.rawQuery(sql, data);
 
     return result.map(row => {
       callback(row);
@@ -96,8 +95,8 @@ class Sqlite extends Connection {
   }
 
   async count (query, useSkipAndLimit = false) {
-    let sqlArr = [ `SELECT count(*) as ${this.escape('count')} FROM ${this.escape(query.schema.name)}` ];
-    let [ wheres, data ] = this.getWhere(query);
+    const sqlArr = [`SELECT count(*) as ${this.escape('count')} FROM ${this.escape(query.schema.name)}`];
+    const [wheres, data] = this.getWhere(query);
     if (wheres) {
       sqlArr.push(wheres);
     }
@@ -112,28 +111,28 @@ class Sqlite extends Connection {
       }
     }
 
-    let sql = sqlArr.join(' ');
+    const sql = sqlArr.join(' ');
 
-    let { result: [ row ] } = await this.rawQuery(sql, data);
+    const { result: [row] } = await this.rawQuery(sql, data);
     return row.count;
   }
 
   async delete (query, callback) {
-    let [ wheres, data ] = this.getWhere(query);
-    let sqlArr = [`DELETE FROM ${query.schema.name}`];
+    const [wheres, data] = this.getWhere(query);
+    const sqlArr = [`DELETE FROM ${query.schema.name}`];
     if (wheres) {
       sqlArr.push(wheres);
     }
 
-    let sql = sqlArr.join(' ');
+    const sql = sqlArr.join(' ');
 
     await this.rawQuery(sql, data);
   }
 
   getOrderBy (query) {
-    let orderBys = [];
-    for (let key in query.sorts) {
-      let val = query.sorts[key];
+    const orderBys = [];
+    for (const key in query.sorts) {
+      const val = query.sorts[key];
 
       orderBys.push(`${this.escape(key)} ${val > 0 ? 'ASC' : 'DESC'}`);
     }
@@ -146,39 +145,39 @@ class Sqlite extends Connection {
   }
 
   async update (query) {
-    let keys = Object.keys(query.sets);
+    const keys = Object.keys(query.sets);
 
-    let params = keys.map(k => this.serialize(query.sets[k]));
-    let placeholder = keys.map(k => `${this.escape(k)} = ?`);
+    const params = keys.map(k => this.serialize(query.sets[k]));
+    const placeholder = keys.map(k => `${this.escape(k)} = ?`);
 
-    let [ wheres, data ] = this.getWhere(query);
-    let sql = `UPDATE ${query.schema.name} SET ${placeholder.join(', ')} ${wheres}`;
-    let { result } = await this.rawQuery(sql, params.concat(data));
+    const [wheres, data] = this.getWhere(query);
+    const sql = `UPDATE ${query.schema.name} SET ${placeholder.join(', ')} ${wheres}`;
+    const { result } = await this.rawQuery(sql, params.concat(data));
 
     return result.changes;
   }
 
   getWhere (query) {
-    let wheres = [];
+    const wheres = [];
     let data = [];
-    for (let key in query.criteria) {
+    for (const key in query.criteria) {
       let value = query.criteria[key];
 
       if (key === '!or') {
-        let or = this.getOr(value);
+        const or = this.getOr(value);
         wheres.push(or.where);
         data = data.concat(or.data);
         continue;
       }
 
-      let [ field, operator = 'eq' ] = key.split('!');
+      const [field, operator = 'eq'] = key.split('!');
 
       // add by januar: for chek if operator like value change to %
       if (operator === 'like') {
         value = `%${value}%`;
       }
 
-      data.push(value);
+      data.push(this.serialize(value));
       wheres.push(`${this.escape(field)} ${OPERATORS[operator]} ?`);
     }
 
@@ -186,16 +185,16 @@ class Sqlite extends Connection {
       return [];
     }
 
-    return [ `WHERE ${wheres.join(' AND ')}`, data ];
+    return [`WHERE ${wheres.join(' AND ')}`, data];
   }
 
   getOr (query) {
-    let wheres = [];
-    let data = [];
+    const wheres = [];
+    const data = [];
     for (let i = 0; i < query.length; i++) {
-      let key = Object.keys(query[i])[0];
+      const key = Object.keys(query[i])[0];
       let value = Object.values(query[i])[0];
-      let [ field, operator = 'eq' ] = key.split('!');
+      const [field, operator = 'eq'] = key.split('!');
       if (operator === 'like') {
         value = '%' + value + '%';
       }
@@ -207,7 +206,7 @@ class Sqlite extends Connection {
 
   async getRaw () {
     if (!this._db) {
-      await fser.mkdirp(fs, path.dirname(this.file));
+      await fs.ensureDir(path.dirname(this.file));
       this._db = betterSqlite3(this.file);
       this._db.pragma('journal_mode = WAL');
       await new Promise(resolve => setTimeout(resolve));
@@ -222,12 +221,12 @@ class Sqlite extends Connection {
       debugQuery('??? %d %o', this.index, params);
     }
 
-    let conn = await this.getRaw();
+    const conn = await this.getRaw();
     if (sql.startsWith('SELECT')) {
-      let result = await conn.prepare(sql).all(...params);
+      const result = await conn.prepare(sql).all(...params);
       return { result };
     } else {
-      let result = await conn.prepare(sql).run(...params);
+      const result = await conn.prepare(sql).run(...params);
       return { result };
     }
   }
@@ -265,7 +264,7 @@ class Sqlite extends Connection {
       return value.getTime();
     }
 
-    let valueType = typeof value;
+    const valueType = typeof value;
     if (valueType === 'object') {
       if (typeof value.toJSON === 'function') {
         return value.toJSON();

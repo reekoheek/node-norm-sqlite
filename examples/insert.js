@@ -3,7 +3,7 @@ const { Manager } = require('node-norm');
 const ID = process.argv[2];
 
 (async () => {
-  let manager = new Manager({
+  const manager = new Manager({
     connections: [
       {
         adapter: require('..'),
@@ -15,7 +15,7 @@ const ID = process.argv[2];
   await manager.runSession(async session => {
     await session.acquire();
 
-    let run = async () => {
+    const run = async () => {
       await session.factory('foo')
         .insert({
           foo: ID + ' ' + Date.now(),

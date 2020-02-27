@@ -18,7 +18,7 @@ describe('Concurrency', () => {
       // noop
     }
 
-    let db = await sqlite3(DB_FILE);
+    const db = await sqlite3(DB_FILE);
     await db.prepare('CREATE TABLE foo (id INTEGER PRIMARY KEY AUTOINCREMENT, foo TEXT)').run();
     db.close();
 
@@ -56,7 +56,7 @@ describe('Concurrency', () => {
           resolve();
         }, timeout);
 
-        let run = async () => {
+        const run = async () => {
           if (!running) {
             return;
           }
@@ -87,7 +87,7 @@ describe('Concurrency', () => {
     ]);
 
     await manager.runSession(async session => {
-      let rows = await session.factory('foo').all();
+      const rows = await session.factory('foo').all();
       assert(rows.length > 100);
     });
   }).timeout(5000);
