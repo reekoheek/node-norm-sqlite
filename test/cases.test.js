@@ -6,26 +6,27 @@ const path = require('path');
 const fs = require('fs');
 const NDateTime = require('node-norm/schemas/ndatetime');
 
+const DB_FILE = path.join(process.cwd(), 'test.db');
+
 describe('Cases', () => {
-  const DB_FILE = path.join(process.cwd(), 'test.db');
   let db;
   let manager;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     try {
       fs.unlinkSync(DB_FILE);
     } catch (err) {
       // noop
     }
 
-    db = await sqlite3(DB_FILE);
-    await db.prepare('CREATE TABLE foo (id INTEGER PRIMARY KEY AUTOINCREMENT, foo TEXT)').run();
-    await db.prepare('CREATE TABLE bar (id INTEGER PRIMARY KEY AUTOINCREMENT, datetime DATETIME)').run();
-    await db.prepare('CREATE TABLE test1 (id INTEGER PRIMARY KEY AUTOINCREMENT, `order` TEXT,`key` TEXT,`group` TEXT)')
+    db = sqlite3(DB_FILE);
+    db.prepare('CREATE TABLE foo (id INTEGER PRIMARY KEY AUTOINCREMENT, foo TEXT)').run();
+    db.prepare('CREATE TABLE bar (id INTEGER PRIMARY KEY AUTOINCREMENT, datetime DATETIME)').run();
+    db.prepare('CREATE TABLE test1 (id INTEGER PRIMARY KEY AUTOINCREMENT, `order` TEXT,`key` TEXT,`group` TEXT)')
       .run();
-    await db.prepare('INSERT INTO foo (foo) VALUES (?), (?)').run('1', '2');
-    await db.prepare('INSERT INTO bar (datetime) VALUES (?)').run('2019-11-21 00:00:00');
-    await db.prepare('INSERT INTO test1 (`order`,`key`,`group`) VALUES (?,?,?), (?,?,?)')
+    db.prepare('INSERT INTO foo (foo) VALUES (?), (?)').run('1', '2');
+    db.prepare('INSERT INTO bar (datetime) VALUES (?)').run('2019-11-21 00:00:00');
+    db.prepare('INSERT INTO test1 (`order`,`key`,`group`) VALUES (?,?,?), (?,?,?)')
       .run('1', '2', '3', '4', '5', '6');
 
     manager = new Manager({
@@ -76,7 +77,7 @@ describe('Cases', () => {
     });
   });
 
-  it.only('update record with fields: date', async () => {
+  it('update record with fields: date', async () => {
     await manager.runSession(async session => {
       const datetime = new Date(); // '1982-11-21 00:00:00';
       // console.log(new Date(datetime));
@@ -86,28 +87,24 @@ describe('Cases', () => {
 
       assert.strictEqual(affected, 1);
 
-      const bar = await db.prepare('SELECT * FROM bar WHERE id = 1').get();
+      let bar = await db.prepare('SELECT * FROM bar WHERE id = 1').get();
       assert(bar);
 
-      {
-        const bar = await session.factory('bar', 1).single();
-        // console.log(bar);
-        await session.factory('bar', 1)
-          .set(bar)
-          .save();
-      }
+      bar = await session.factory('bar', 1).single();
+      // console.log(bar);
+      await session.factory('bar', 1)
+        .set(bar)
+        .save();
 
       const bar1 = await db.prepare('SELECT * FROM bar WHERE id = 1').get();
       assert(bar1);
-      assert.strictEqual(bar.datetime.toString(), bar1.datetime.toString());
+      assert.strictEqual(bar.datetime.toString(), new Date(bar1.datetime).toString());
 
-      {
-        const bar = await session.factory('bar', 1).single();
-        // console.log(bar);
-        await session.factory('bar', 1)
-          .set(bar)
-          .save();
-      }
+      bar = await session.factory('bar', 1).single();
+      // console.log(bar);
+      await session.factory('bar', 1)
+        .set(bar)
+        .save();
     });
   });
 

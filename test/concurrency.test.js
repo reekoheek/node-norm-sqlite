@@ -1,3 +1,4 @@
+/* eslint-disable mocha/no-hooks-for-single-case */
 const sqlite3 = require('better-sqlite3');
 const { Manager } = require('node-norm');
 const adapter = require('..');
@@ -7,8 +8,9 @@ const assert = require('assert');
 
 process.on('unhandledRejection', err => console.error('Unhandled', err));
 
+const DB_FILE = path.join(process.cwd(), 'test.db');
+
 describe('Concurrency', () => {
-  const DB_FILE = path.join(process.cwd(), 'test.db');
   let manager;
 
   beforeEach(async () => {
@@ -41,7 +43,7 @@ describe('Concurrency', () => {
     }
   });
 
-  async function runSession (index, timeout = 500, wait) {
+  async function runSession (index, timeout = 500, wait = false) {
     if (wait) {
       await new Promise(resolve => setTimeout(resolve, wait));
     }

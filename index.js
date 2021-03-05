@@ -14,8 +14,19 @@ const OPERATORS = {
   like: 'like',
 };
 
-let index = 0;
+const DEFAULT_TYPES = {
+  nbig: 'INTEGER',
+  nboolean: 'TINYINT',
+  ndouble: 'DECIMAL(25,8)',
+  ninteger: 'INTEGER',
+  nstring: 'VARCHAR(255)',
+  ntext: 'TEXT',
+  ndatetime: 'DATETIME',
+};
 
+const FALLBACK_TYPE = 'TEXT';
+
+let index = 0;
 class Sqlite extends Connection {
   constructor (options) {
     super(options);
@@ -32,13 +43,13 @@ class Sqlite extends Connection {
   async insert (query, callback = () => {}) {
     let fieldNames = query.schema.fields.map(field => field.name);
     if (!fieldNames.length) {
-      fieldNames = query.rows.reduce((fieldNames, row) => {
+      fieldNames = query.rows.reduce((result, row) => {
         for (const f in row) {
-          if (fieldNames.indexOf(f) === -1) {
-            fieldNames.push(f);
+          if (result.indexOf(f) === -1) {
+            result.push(f);
           }
         }
-        return fieldNames;
+        return result;
       }, []);
     }
 
@@ -65,6 +76,7 @@ class Sqlite extends Connection {
   }
 
   async load (query, callback = () => {}) {
+    const { length, offset } = query;
     const sqlArr = [`SELECT * FROM ${this.escape(query.schema.name)}`];
     const [wheres, data] = this.getWhere(query);
     if (wheres) {
@@ -76,11 +88,11 @@ class Sqlite extends Connection {
       sqlArr.push(orderBys);
     }
 
-    if (query.length >= 0) {
-      sqlArr.push(`LIMIT ${query.length}`);
+    if (length >= 0) {
+      sqlArr.push(`LIMIT ${length}`);
 
-      if (query.offset > 0) {
-        sqlArr.push(`OFFSET ${query.offset}`);
+      if (offset > 0) {
+        sqlArr.push(`OFFSET ${offset}`);
       }
     }
 
@@ -95,18 +107,20 @@ class Sqlite extends Connection {
   }
 
   async count (query, useSkipAndLimit = false) {
-    const sqlArr = [`SELECT count(*) as ${this.escape('count')} FROM ${this.escape(query.schema.name)}`];
+    const { schema, length, offset } = query;
+
+    const sqlArr = [`SELECT count(*) as ${this.escape('count')} FROM ${this.escape(schema.name)}`];
     const [wheres, data] = this.getWhere(query);
     if (wheres) {
       sqlArr.push(wheres);
     }
 
     if (useSkipAndLimit) {
-      if (query.length >= 0) {
-        sqlArr.push(`LIMIT ${query.length}`);
+      if (length >= 0) {
+        sqlArr.push(`LIMIT ${length}`);
 
-        if (query.offset > 0) {
-          sqlArr.push(`OFFSET ${query.offset}`);
+        if (offset > 0) {
+          sqlArr.push(`OFFSET ${offset}`);
         }
       }
     }
@@ -117,7 +131,7 @@ class Sqlite extends Connection {
     return row.count;
   }
 
-  async delete (query, callback) {
+  async delete (query) {
     const [wheres, data] = this.getWhere(query);
     const sqlArr = [`DELETE FROM ${query.schema.name}`];
     if (wheres) {
@@ -287,6 +301,55 @@ class Sqlite extends Connection {
 
     this._db.close();
   }
+
+  async defined ({ name }) {
+    try {
+      await this.rawQuery(`SELECT * FROM ${this.escape(name)} LIMIT 1`);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  async define ({ name, fields }) {
+    const fieldLines = fields.map(field => {
+      const overridden = field.get('sqlite.ddl.override');
+      if (overridden) {
+        return `${this.escape(field.name)} ${overridden.trim()}`;
+      }
+
+      const schemaType = field.constructor.name.toLowerCase();
+      const dataType = field.get('sqlite.ddl.type') || getDefaultType(schemaType);
+      const lineTokens = [`${this.escape(field.name)} ${dataType}`];
+      lineTokens.push(`${getFilter(field, 'required') ? 'NOT NULL' : 'NULL'}`);
+      if (getFilter(field, 'unique')) {
+        lineTokens.push('UNIQUE');
+      }
+      return lineTokens.join(' ').trim();
+    });
+
+    fieldLines.unshift(`${this.escape('id')} INTEGER PRIMARY KEY AUTOINCREMENT`);
+
+    const sql = `
+CREATE TABLE ${this.escape(name)} (
+  ${fieldLines.join(',\n  ')}
+)
+    `.trim();
+
+    await this.rawQuery(sql);
+  }
+
+  async undefine ({ name }) {
+    await this.rawQuery(`DROP TABLE ${this.escape(name)}`);
+  }
 }
 
 module.exports = Sqlite;
+
+function getDefaultType (schemaType) {
+  return DEFAULT_TYPES[schemaType] || FALLBACK_TYPE;
+}
+
+function getFilter (field, name) {
+  return field.rawFilters.find(f => f[0] === name);
+}
